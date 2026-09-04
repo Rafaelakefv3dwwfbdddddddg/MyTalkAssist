@@ -1,13 +1,17 @@
 {
   "expo": {
-    "name": "MyTalkAssist",
-    "slug": "MyTalkAssist",
+    "name": "TalkAssist — Comunicação Acessível",
+    "slug": "talkassist",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Permita que o TalkAssist reconheça sua fala.",
+        "NSMicrophoneUsageDescription": "Permita que o TalkAssist use o microfone."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -16,10 +20,23 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.talkassist"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Permita que o TalkAssist use o microfone.",
+          "speechRecognitionPermission": "Permita que o TalkAssist reconheça sua fala."
+        }
+      ]
+    ]
   }
 }

@@ -1,0 +1,10 @@
+services:
+  babelplugintransformflowenums:
+    image: babelplugintransformflowenums
+    build:
+      context: node_modules/babel-plugin-transform-flow-enums
+      dockerfile: ./Dockerfile
+    environment:
+      NODE_ENV: production
+    ports:
+      - 3000:3000
