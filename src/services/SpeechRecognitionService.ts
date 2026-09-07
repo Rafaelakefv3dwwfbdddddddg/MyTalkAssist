@@ -4,6 +4,29 @@ import {
   type ExpoSpeechRecognitionErrorEvent,
 } from 'expo-speech-recognition';
 
+type DesktopSpeechBridge = {
+  isAvailable: () => Promise<boolean>;
+  requestPermission: () => Promise<{ granted: boolean }>;
+  start: () => Promise<void>;
+  stop: () => Promise<void>;
+  cancel: () => Promise<void>;
+  onResult: (handler: (result: RecognitionResult) => void) => () => void;
+  onError: (handler: (error: RecognitionError) => void) => () => void;
+  onEnd: (handler: () => void) => () => void;
+};
+
+declare global {
+  interface Window {
+    talkAssistDesktop?: {
+      speech: DesktopSpeechBridge;
+      tts: {
+        speak: (text: string, rate: number, pitch: number) => Promise<void>;
+        stop: () => Promise<void>;
+      };
+    };
+  }
+}
+
 export type RecognitionResult = {
   text: string;
   confidence: number;
@@ -16,6 +39,7 @@ export type RecognitionError = {
 };
 
 class SpeechRecognitionService {
+  private desktopCleanup?: () => void;
   private resultSubscription?: { remove: () => void };
   private errorSubscription?: { remove: () => void };
   private endSubscription?: { remove: () => void };
@@ -24,10 +48,16 @@ class SpeechRecognitionService {
   private endHandler?: () => void;
 
   requestPermission() {
+    if (typeof window !== 'undefined' && window.talkAssistDesktop) {
+      return window.talkAssistDesktop.speech.requestPermission();
+    }
     return ExpoSpeechRecognitionModule.requestPermissionsAsync();
   }
 
   isAvailable() {
+    if (typeof window !== 'undefined' && window.talkAssistDesktop) {
+      return window.talkAssistDesktop.speech.isAvailable();
+    }
     return ExpoSpeechRecognitionModule.isRecognitionAvailable();
   }
 
@@ -40,6 +70,19 @@ class SpeechRecognitionService {
     this.resultHandler = onResult;
     this.errorHandler = onError;
     this.endHandler = onEnd;
+    const desktopSpeech = typeof window !== 'undefined' ? window.talkAssistDesktop?.speech : undefined;
+    if (desktopSpeech) {
+      const removeResult = desktopSpeech.onResult(this.onDesktopResult);
+      const removeError = desktopSpeech.onError(this.onDesktopError);
+      const removeEnd = desktopSpeech.onEnd(this.onEnd);
+      this.desktopCleanup = () => {
+        removeResult();
+        removeError();
+        removeEnd();
+      };
+      void desktopSpeech.start();
+      return;
+    }
     this.resultSubscription = ExpoSpeechRecognitionModule.addListener('result', this.onResult);
     this.errorSubscription = ExpoSpeechRecognitionModule.addListener('error', this.onError);
     this.endSubscription = ExpoSpeechRecognitionModule.addListener('end', this.onEnd);
@@ -52,10 +95,19 @@ class SpeechRecognitionService {
   }
 
   stopListening() {
+    if (typeof window !== 'undefined' && window.talkAssistDesktop) {
+      void window.talkAssistDesktop.speech.stop();
+      return;
+    }
     ExpoSpeechRecognitionModule.stop();
   }
 
   cancelListening() {
+    if (typeof window !== 'undefined' && window.talkAssistDesktop) {
+      void window.talkAssistDesktop.speech.cancel();
+      this.cleanupListeners();
+      return;
+    }
     ExpoSpeechRecognitionModule.abort();
     this.cleanupListeners();
   }
@@ -77,12 +129,24 @@ class SpeechRecognitionService {
     this.cleanupListeners();
   };
 
+  private onDesktopResult = (result: RecognitionResult) => {
+    this.resultHandler?.(result);
+    if (result.isFinal) this.cleanupListeners();
+  };
+
+  private onDesktopError = (error: RecognitionError) => {
+    this.errorHandler?.(error);
+    this.cleanupListeners();
+  };
+
   private onEnd = () => {
     this.endHandler?.();
     this.cleanupListeners();
   };
 
   private cleanupListeners() {
+    this.desktopCleanup?.();
+    this.desktopCleanup = undefined;
     this.resultSubscription?.remove();
     this.errorSubscription?.remove();
     this.endSubscription?.remove();

@@ -19,13 +19,61 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "electron": "^44.2.0",
+    "electron-builder": "^26.15.3",
     "typescript": "~6.0.3"
   },
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "desktop:export": "expo export --platform web",
+    "desktop:dev": "npm run desktop:export && electron electron/main.cjs",
+    "desktop:build": "npm run desktop:export && electron-builder --win",
+    "desktop:portable": "npm run desktop:export && electron-builder --win portable"
   },
-  "private": true
+  "private": true,
+  "build": {
+    "extraMetadata": {
+      "main": "electron/main.cjs"
+    },
+    "appId": "com.talkassist.desktop",
+    "productName": "TalkAssist",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "portable": {
+      "artifactName": "TalkAssist-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "artifactName": "TalkAssist-Setup-${version}-${arch}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TalkAssist"
+    }
+  }
 }

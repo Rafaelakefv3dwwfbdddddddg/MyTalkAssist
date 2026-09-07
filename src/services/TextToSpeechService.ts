@@ -5,6 +5,9 @@ class TextToSpeechService {
 
   async speak(text: string, rate = 0.9, pitch = 1) {
     this.wasStopped = false;
+    if (typeof window !== 'undefined' && window.talkAssistDesktop) {
+      return window.talkAssistDesktop.tts.speak(text, rate, pitch);
+    }
     const voices = await Speech.getAvailableVoicesAsync();
     const brazilianVoice = voices.find((voice) => voice.language.toLowerCase() === 'pt-br')
       ?? voices.find((voice) => voice.language.toLowerCase().startsWith('pt-'));
@@ -24,6 +27,9 @@ class TextToSpeechService {
 
   stop() {
     this.wasStopped = true;
+    if (typeof window !== 'undefined' && window.talkAssistDesktop) {
+      return window.talkAssistDesktop.tts.stop();
+    }
     return Speech.stop();
   }
 }
