@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, session } = require('electron');
 const { spawn } = require('node:child_process');
 const { createReadStream, existsSync, statSync } = require('node:fs');
 const http = require('node:http');
@@ -9,6 +9,8 @@ let recognitionProcess;
 let speechWasCancelled = false;
 let ttsProcess;
 let staticServer;
+let cameraPermissionGranted = false;
+let audioPermissionGranted = false;
 
 const distPath = path.resolve(__dirname, '..', 'dist');
 
@@ -49,6 +51,77 @@ function powershellPath() {
     return path.join(__dirname, 'windows-speech.ps1');
 }
 
+function isTalkAssistWindow(webContents) {
+    if (!mainWindow || mainWindow.isDestroyed() || webContents !== mainWindow.webContents) return false;
+    try {
+        const url = new URL(webContents.getURL());
+        return url.protocol === 'http:' && url.hostname === '127.0.0.1';
+    } catch {
+        return false;
+    }
+}
+
+function configureCameraPermissions() {
+    session.defaultSession.setPermissionCheckHandler((webContents, permission, _origin, details) => {
+        if (permission !== 'media' || !isTalkAssistWindow(webContents)) return false;
+        if (details?.mediaType === 'video') return cameraPermissionGranted;
+        if (details?.mediaType === 'audio') return audioPermissionGranted;
+        return false;
+    });
+
+    session.defaultSession.setPermissionRequestHandler(async (webContents, permission, callback, details) => {
+        const mediaTypes = details?.mediaTypes ?? [];
+        if (permission !== 'media' || !isTalkAssistWindow(webContents) || mediaTypes.includes('video') && mediaTypes.includes('audio')) {
+            callback(false);
+            return;
+        }
+
+        if (mediaTypes.length === 1 && mediaTypes[0] === 'audio') {
+            try {
+                const { response } = await dialog.showMessageBox(mainWindow, {
+                    type: 'question',
+                    title: 'Permissão do microfone',
+                    message: 'O TalkAssist quer gravar uma amostra de voz.',
+                    detail: 'A gravação fica neste computador e só é salva após sua confirmação na tela Minha Voz.',
+                    buttons: ['Permitir', 'Não permitir'],
+                    defaultId: 1,
+                    cancelId: 1,
+                    noLink: true,
+                });
+                audioPermissionGranted = response === 0;
+                callback(audioPermissionGranted);
+            } catch {
+                audioPermissionGranted = false;
+                callback(false);
+            }
+            return;
+        }
+
+        if (mediaTypes.length !== 1 || mediaTypes[0] !== 'video') {
+            callback(false);
+            return;
+        }
+
+        try {
+            const { response } = await dialog.showMessageBox(mainWindow, {
+                type: 'question',
+                title: 'Permissão da câmera',
+                message: 'O TalkAssist quer acessar a câmera.',
+                detail: 'A câmera exibirá uma prévia local. Nenhuma imagem ou vídeo será gravado ou enviado.',
+                buttons: ['Permitir', 'Não permitir'],
+                defaultId: 1,
+                cancelId: 1,
+                noLink: true,
+            });
+            cameraPermissionGranted = response === 0;
+            callback(cameraPermissionGranted);
+        } catch {
+            cameraPermissionGranted = false;
+            callback(false);
+        }
+    });
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1100,
@@ -82,11 +155,16 @@ function stopRecognition(cancelled) {
 
 ipcMain.handle('speech:is-available', () => process.platform === 'win32');
 ipcMain.handle('speech:request-permission', () => ({ granted: process.platform === 'win32' }));
-ipcMain.handle('speech:start', () => {
+ipcMain.handle('speech:start', (_event, contextualPhrases = []) => {
     stopRecognition(true);
     speechWasCancelled = false;
+    const phrases = Array.isArray(contextualPhrases)
+        ? contextualPhrases.filter((phrase) => typeof phrase === 'string' && phrase.trim()).slice(0, 100)
+        : [];
+    const phraseListBase64 = Buffer.from(JSON.stringify(phrases), 'utf8').toString('base64');
     recognitionProcess = spawn('powershell.exe', [
-        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', powershellPath(), '-Mode', 'recognize',
+        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', powershellPath(),
+        '-Mode', 'recognize', '-PhraseListBase64', phraseListBase64,
     ], { windowsHide: true });
     let output = '';
     recognitionProcess.stdout.setEncoding('utf8');
@@ -134,6 +212,7 @@ ipcMain.handle('tts:stop', () => {
 });
 
 app.whenReady().then(async () => {
+    configureCameraPermissions();
     await startStaticServer();
     createWindow();
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

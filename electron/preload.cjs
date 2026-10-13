@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('talkAssistDesktop', {
     speech: {
         isAvailable: () => ipcRenderer.invoke('speech:is-available'),
         requestPermission: () => ipcRenderer.invoke('speech:request-permission'),
-        start: () => ipcRenderer.invoke('speech:start'),
+        start: (contextualPhrases) => ipcRenderer.invoke('speech:start', contextualPhrases),
         stop: () => ipcRenderer.invoke('speech:stop'),
         cancel: () => ipcRenderer.invoke('speech:cancel'),
         onResult: (handler) => subscribe('speech:result', handler),

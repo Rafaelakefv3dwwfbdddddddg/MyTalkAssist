@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import SpeechRecognitionService from '../services/SpeechRecognitionService';
 import TextToSpeechService from '../services/TextToSpeechService';
 import AICommunicationService, { type AICommunicationAnalysis } from '../services/AICommunicationService';
 import ConversationService, { type ConversationMessage } from '../services/ConversationService';
+import { loadContextualPhrases } from '../services/PersonalVoiceService';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
 const INITIAL_READ_PHRASE = 'Eu quero beber água.';
 
 export default function HomeScreen() {
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const [isListening, setIsListening] = useState(false);
   const [listeningTarget, setListeningTarget] = useState<'read' | 'message' | 'response' | null>(null);
   const [conversationMode, setConversationMode] = useState(false);
@@ -46,6 +51,7 @@ export default function HomeScreen() {
       setListeningTarget('read');
       setMessage('Ouvindo. Leia a frase em voz alta.');
       AccessibilityInfo.announceForAccessibility('Ouvindo. Leia a frase em voz alta.');
+      const contextualPhrases = await loadContextualPhrases();
       SpeechRecognitionService.startListening(
         ({ text, confidence, isFinal }) => {
           if (!isFinal) {
@@ -73,6 +79,7 @@ export default function HomeScreen() {
           setListeningTarget(null);
           setMessage('Nenhuma fala foi reconhecida. Tente novamente.');
         },
+        contextualPhrases,
       );
     } catch {
       setIsListening(false);
@@ -122,6 +129,7 @@ export default function HomeScreen() {
       setListeningTarget('message');
       setMessage('Estou ouvindo. Fale agora.');
       AccessibilityInfo.announceForAccessibility('Estou ouvindo. Fale agora.');
+      const contextualPhrases = await loadContextualPhrases();
       SpeechRecognitionService.startListening(
         ({ text, isFinal }) => {
           setTypedMessage(mergeRecognizedText(baseText, text));
@@ -141,6 +149,7 @@ export default function HomeScreen() {
           setListeningTarget(null);
           setMessage('Nenhum texto foi reconhecido. Tente novamente.');
         },
+        contextualPhrases,
       );
     } catch {
       setIsListening(false);
@@ -165,6 +174,7 @@ export default function HomeScreen() {
       setIsListening(true);
       setListeningTarget('response');
       setMessage('Estou ouvindo a resposta. Fale agora.');
+      const contextualPhrases = await loadContextualPhrases();
       SpeechRecognitionService.startListening(
         ({ text, confidence, isFinal }) => {
           if (!isFinal) {
@@ -192,6 +202,7 @@ export default function HomeScreen() {
           setListeningTarget(null);
           setMessage('Nenhuma resposta foi reconhecida. Tente novamente.');
         },
+        contextualPhrases,
       );
     } catch {
       setIsListening(false);
@@ -271,6 +282,24 @@ export default function HomeScreen() {
   return (
     <ScrollView contentContainerStyle={styles.content} style={styles.container}>
       <Text accessibilityRole="header" style={styles.title}>Comunicação Acessível</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Conversar em Libras"
+        accessibilityHint="Abre a conversa com câmera, texto e voz para duas pessoas"
+        onPress={() => navigation.navigate('LibrasConversation')}
+        style={[styles.button, styles.librasButton]}
+      >
+        <Text style={styles.buttonText}>CONVERSAR EM LIBRAS</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Minha Voz"
+        accessibilityHint="Grava e gerencia frases confirmadas para o vocabulário do reconhecimento"
+        onPress={() => navigation.navigate('PersonalVoice')}
+        style={[styles.button, styles.voiceProfileButton]}
+      >
+        <Text style={styles.buttonText}>MINHA VOZ</Text>
+      </Pressable>
       <Text accessibilityRole="header" style={styles.sectionTitle}>PCD LÊ</Text>
       <TextInput
         accessibilityRole="text"
@@ -442,6 +471,8 @@ const styles = StyleSheet.create({
   title: { color: '#102A43', fontSize: 30, fontWeight: '800', marginBottom: 20 },
   instruction: { color: '#243B53', fontSize: 20, marginBottom: 10 },
   button: { alignItems: 'center', backgroundColor: '#007C91', borderRadius: 12, minHeight: 72, justifyContent: 'center', padding: 18 },
+  librasButton: { backgroundColor: '#147D64', marginBottom: 20 },
+  voiceProfileButton: { backgroundColor: '#486581', marginBottom: 20 },
   stopButton: { backgroundColor: '#B42318' },
   buttonText: { color: '#FFFFFF', fontSize: 22, fontWeight: '800' },
   status: { color: '#243B53', fontSize: 18, lineHeight: 26, marginTop: 20, textAlign: 'center' },

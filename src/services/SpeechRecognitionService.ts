@@ -3,11 +3,12 @@ import {
   type ExpoSpeechRecognitionResultEvent,
   type ExpoSpeechRecognitionErrorEvent,
 } from 'expo-speech-recognition';
+import { Platform } from 'react-native';
 
 type DesktopSpeechBridge = {
   isAvailable: () => Promise<boolean>;
   requestPermission: () => Promise<{ granted: boolean }>;
-  start: () => Promise<void>;
+  start: (contextualPhrases?: string[]) => Promise<void>;
   stop: () => Promise<void>;
   cancel: () => Promise<void>;
   onResult: (handler: (result: RecognitionResult) => void) => () => void;
@@ -65,6 +66,7 @@ class SpeechRecognitionService {
     onResult: (result: RecognitionResult) => void,
     onError: (error: RecognitionError) => void,
     onEnd?: () => void,
+    contextualPhrases: string[] = [],
   ) {
     this.cleanupListeners();
     this.resultHandler = onResult;
@@ -80,7 +82,7 @@ class SpeechRecognitionService {
         removeError();
         removeEnd();
       };
-      void desktopSpeech.start();
+      void desktopSpeech.start(contextualPhrases);
       return;
     }
     this.resultSubscription = ExpoSpeechRecognitionModule.addListener('result', this.onResult);
@@ -91,6 +93,7 @@ class SpeechRecognitionService {
       interimResults: true,
       continuous: false,
       addsPunctuation: true,
+      contextualStrings: Platform.OS === 'web' ? undefined : contextualPhrases,
     });
   }
 

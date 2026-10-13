@@ -9,6 +9,7 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
+        "NSCameraUsageDescription": "Permita que o TalkAssist mostre a prévia da câmera para apoiar conversas em Libras.",
         "NSSpeechRecognitionUsageDescription": "Permita que o TalkAssist reconheça sua fala.",
         "NSMicrophoneUsageDescription": "Permita que o TalkAssist use o microfone."
       }
@@ -22,6 +23,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ],
       "package": "com.anonymous.talkassist"
@@ -35,6 +37,19 @@
         {
           "microphonePermission": "Permita que o TalkAssist use o microfone.",
           "speechRecognitionPermission": "Permita que o TalkAssist reconheça sua fala."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permita que o TalkAssist mostre a prévia da câmera para apoiar conversas em Libras.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Permita que o TalkAssist grave amostras de voz que ficam neste dispositivo."
         }
       ]
     ]

@@ -1,6 +1,7 @@
 param(
   [Parameter(Mandatory = $true)][ValidateSet('recognize', 'speak')][string]$Mode,
   [string]$TextBase64,
+  [string]$PhraseListBase64,
   [double]$Rate = 1,
   [double]$Pitch = 1
 )
@@ -13,14 +14,30 @@ if ($Mode -eq 'recognize') {
     $culture = [Globalization.CultureInfo]::GetCultureInfo('pt-BR')
     $recognizer = New-Object System.Speech.Recognition.SpeechRecognitionEngine($culture)
     $recognizer.LoadGrammar((New-Object System.Speech.Recognition.DictationGrammar))
+    if ($PhraseListBase64) {
+      $phrases = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($PhraseListBase64)) | ConvertFrom-Json
+      $choices = New-Object System.Speech.Recognition.Choices
+      foreach ($phrase in @($phrases)) {
+        $value = [string]$phrase
+        if ($value.Trim() -and $value.Length -le 120) { $choices.Add($value) }
+      }
+      if ($choices.Count -gt 0) {
+        $builder = New-Object System.Speech.Recognition.GrammarBuilder
+        $builder.Culture = $culture
+        $builder.Append($choices)
+        $recognizer.LoadGrammar((New-Object System.Speech.Recognition.Grammar($builder)))
+      }
+    }
     $recognizer.SetInputToDefaultAudioDevice()
     $result = $recognizer.Recognize()
     if ($null -eq $result) {
       @{ type = 'end' } | ConvertTo-Json -Compress
-    } else {
+    }
+    else {
       @{ type = 'result'; text = $result.Text; confidence = [double]$result.Confidence; isFinal = $true } | ConvertTo-Json -Compress
     }
-  } catch {
+  }
+  catch {
     @{ type = 'error'; code = 'windows-speech'; message = $_.Exception.Message } | ConvertTo-Json -Compress
     exit 1
   }
@@ -35,7 +52,8 @@ try {
   if ($null -ne $voice) { $synthesizer.SelectVoice($voice.VoiceInfo.Name) }
   $synthesizer.Rate = [Math]::Max(-10, [Math]::Min(10, [int](($Rate - 1) * 10)))
   $synthesizer.Speak($text)
-} catch {
+}
+catch {
   Write-Error $_.Exception.Message
   exit 1
 }
